@@ -1,0 +1,203 @@
+﻿@page "/"
+@using UniversalHardwareAssistant.Components.Models
+@using UniversalHardwareAssistant.Components.Services
+@inject IPythonIntegrationService PythonService
+
+<div class="diagnostics-container">
+    <div class="header-actions">
+        <h2>System Diagnostics</h2>
+    </div>
+
+    @if (_error != null)
+    {
+        <div class="error-message">
+            <p>Error: @_error</p>
+        </div>
+    }
+
+    @if (_diagnosticsResult != null)
+    {
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h3>CPU Usage</h3>
+                <div class="cpu-metrics">
+                    <p>Cores: @_diagnosticsResult.RawMetrics?.CpuCount</p>
+                    <p>Average Usage: @(_diagnosticsResult.AnalyzedMetrics?.Cpu.AverageUsage.ToString("F1"))%</p>
+                    @if (_diagnosticsResult.AnalyzedMetrics?.Cpu.HighUsageCores.Any() == true)
+                    {
+                        <p class="warning">High Usage on Cores: @string.Join(", ", _diagnosticsResult.AnalyzedMetrics.Cpu.HighUsageCores)</p>
+                    }
+                    <div class="cpu-usage-bars">
+                        @foreach (var cpu in _diagnosticsResult.RawMetrics?.Cpus ?? Enumerable.Empty<CpuInfo>())
+                        {
+                            <div class="usage-bar-container">
+                                <div class="usage-label">Core @cpu.Index</div>
+                                <div class="usage-bar">
+                                    <div class="usage-fill" style="width: @cpu.Usage%">
+                                        @cpu.Usage.ToString("F1")%
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <h3>Memory Usage</h3>
+                <div class="memory-metrics">
+                    <div class="memory-gauge">
+                        <div class="gauge-circle @GetMemoryPressureClass()">
+                            <div class="gauge-percentage">
+                                @(_diagnosticsResult.RawMetrics?.MemoryUsagePercentage.ToString("F1"))%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="memory-details">
+                        <p>Total: @(_diagnosticsResult.RawMetrics?.TotalMemoryGb.ToString("F1")) GB</p>
+                        <p>Used: @(_diagnosticsResult.RawMetrics?.UsedMemoryGb.ToString("F1")) GB</p>
+                        <p>Available: @(_diagnosticsResult.RawMetrics?.AvailableMemoryGb.ToString("F1")) GB</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <h3>Storage</h3>
+                <div class="storage-metrics">
+                    @foreach (var disk in _diagnosticsResult.RawMetrics?.Disks ?? Enumerable.Empty<DiskInfo>())
+                    {
+                        <div class="disk-info">
+                            <h4>@disk.MountPoint</h4>
+                            <div class="disk-usage-bar">
+                                <div class="usage-fill @GetStorageStatusClass(disk.AvailableGb)"
+                                     style="@($"width: {(disk.UsedGb / disk.TotalGb * 100):F1}%")">
+                                </div>
+                            </div>
+                            <div class="disk-details">
+                                <p>Total: @disk.TotalGb.ToString("F1") GB</p>
+                                <p>Used: @disk.UsedGb.ToString("F1") GB</p>
+                                <p>Available: @disk.AvailableGb.ToString("F1") GB</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="recommendations-section">
+            <h3>AI Recommendations</h3>
+            <div class="recommendations-grid">
+                @if (_diagnosticsResult.Recommendations?.CriticalIssues.Any() == true)
+                {
+                    <div class="recommendation-card critical">
+                        <h4>Critical Issues</h4>
+                        <ul>
+                            @foreach (var issue in _diagnosticsResult.Recommendations.CriticalIssues)
+                            {
+                                <li>@issue</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @if (_diagnosticsResult.Recommendations?.Performance.Any() == true)
+                {
+                    <div class="recommendation-card">
+                        <h4>Performance</h4>
+                        <ul>
+                            @foreach (var rec in _diagnosticsResult.Recommendations.Performance)
+                            {
+                                <li>@rec</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @if (_diagnosticsResult.Recommendations?.Optimization.Any() == true)
+                {
+                    <div class="recommendation-card">
+                        <h4>Optimization</h4>
+                        <ul>
+                            @foreach (var opt in _diagnosticsResult.Recommendations.Optimization)
+                            {
+                                <li>@opt</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @if (_diagnosticsResult.Recommendations?.UpgradeRecommendations.Any() == true)
+                {
+                    <div class="recommendation-card">
+                        <h4>Upgrades</h4>
+                        <ul>
+                            @foreach (var upgrade in _diagnosticsResult.Recommendations.UpgradeRecommendations)
+                            {
+                                <li>@upgrade</li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div> 
+
+@code {
+    private bool _loading;
+    private string? _error;
+    private DiagnosticsResult? _diagnosticsResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshDiagnostics();
+    }
+
+    private async Task RefreshDiagnostics()
+    {
+        try
+        {
+            _loading = true;
+            _error = null;
+            StateHasChanged();
+
+            _diagnosticsResult = await PythonService.GetDiagnosticsAnalysisAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetMemoryPressureClass()
+    {
+        if (_diagnosticsResult?.AnalyzedMetrics?.Memory.PressureLevel == null) return "";
+        switch (_diagnosticsResult.AnalyzedMetrics.Memory.PressureLevel.ToLower())
+        {
+            case "high":
+                return "critical";
+            case "medium":
+                return "warning";
+            default:
+                return "normal";
+        }
+    }
+
+    private string GetStorageStatusClass(double availableGb)
+    {
+        switch (availableGb)
+        {
+            case < 10:
+                return "critical";
+            case < 50:
+                return "warning";
+            default:
+                return "normal";
+        }
+    }
+}
