@@ -1,3 +1,4 @@
+using HAL.Components;
 using UniversalHardwareAssistant.Components;
 using UniversalHardwareAssistant.Components.Services;
 
