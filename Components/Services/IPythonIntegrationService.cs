@@ -1,6 +1,6 @@
-﻿using UniversalHardwareAssistant.Components.Models;
+﻿using HAL.Components.Models;
 
-namespace UniversalHardwareAssistant.Components.Services;
+namespace HAL.Components.Services;
 
 public interface IPythonIntegrationService
 {

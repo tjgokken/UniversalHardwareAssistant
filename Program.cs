@@ -1,6 +1,5 @@
 using HAL.Components;
-using UniversalHardwareAssistant.Components;
-using UniversalHardwareAssistant.Components.Services;
+using HAL.Components.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

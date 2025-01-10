@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace UniversalHardwareAssistant.Components.Models;
+namespace HAL.Components.Models;
 
 public class DiagnosticsResult
 {
